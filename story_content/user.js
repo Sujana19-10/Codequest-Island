@@ -1,326 +1,221 @@
-window.InitUserScripts = function()
-{
-var player = GetPlayer();
-var object = player.object;
-var addToTimeline = player.addToTimeline;
-var setVar = player.SetVar;
-var getVar = player.GetVar;
-window.Script1 = function()
-{
-  const player = GetPlayer();
+// Import the config.js file
+import { CONFIG } from './config.js';
 
-// Ensure you are accessing the updated variable values
-const Username = player.GetVar("Username");  // TextEntry corresponds to the value entered by the user
-const Useryear = player.GetVar("Useryear");  // TextEntry1 corresponds to the value entered by the user
-const Userhallticketno = player.GetVar("Userhallticketno"); // TextEntry2 corresponds to the value entered by the user
+// Function to get the appropriate API URL based on environment (local or production)
+const getApiUrl = (isValidation = false) => {
+    const apiUrl = window.location.hostname === 'localhost' ? 
+                   (isValidation ? CONFIG.VALIDATION_URL_LOCAL : CONFIG.API_BASE_URL_LOCAL) : 
+                   (isValidation ? CONFIG.VALIDATION_URL : CONFIG.API_BASE_URL);
+    return apiUrl;
+};
 
-// Log the captured values to ensure they are correct
-console.log('Username:', Username);
-console.log('Useryear:', Useryear);
-console.log('Userhallticketno:', Userhallticketno);
+window.InitUserScripts = function() {
+    var player = GetPlayer();
+    var object = player.object;
+    var addToTimeline = player.addToTimeline;
+    var setVar = player.SetVar;
+    var getVar = player.GetVar;
 
-// Send data to the backend (make sure the URL and keys match)
-fetch('http://localhost:3000/api/users', {  // Correct endpoint
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-        Username: Username,       // Use updated variable names (match the backend)
-        Useryear: Useryear,
-        Userhallticketno: Userhallticketno
-    }),
-})
-.then(response => {
-    if (!response.ok) {
-        throw new Error('Network response was not ok');
-    }
-    console.log('User data saved successfully.');
+    window.Script1 = function() {
+        const player = GetPlayer();
 
-    // Proceed to the next slide after the user data is saved
-    player.SetVar("GoToNextSlide", true);  // Set the flag to go to the next slide
-})
-.catch(error => {
-    console.error('Error:', error);
-    // Handle error scenario (optional)
-});
+        // Ensure you are accessing the updated variable values
+        const Username = player.GetVar("Username");
+        const Useryear = player.GetVar("Useryear");
+        const Userhallticketno = player.GetVar("Userhallticketno");
 
-// Make sure to check that this line is being reached and triggered
-console.log('Submitting data to backend...');
-}
+        // Log the captured values to ensure they are correct
+        console.log('Username:', Username);
+        console.log('Useryear:', Useryear);
+        console.log('Userhallticketno:', Userhallticketno);
 
-window.Script2 = function()
-{
-  // Access the Storyline Player
-var player = GetPlayer();
+        // Send data to the backend (make sure the URL and keys match)
+        fetch(`${getApiUrl()}/api/users/createUser`, {  // Correct endpoint for user creation
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                Username: Username,       
+                Useryear: Useryear,
+                Userhallticketno: Userhallticketno
+            }),
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            console.log('User data saved successfully.');
 
-// Retrieve the 'userCode' variable from Storyline
-var userCode = player.GetVar("userCode");
+            // Proceed to the next slide after the user data is saved
+            player.SetVar("GoToNextSlide", true);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
 
-// Send 'userCode' to the backend for validation
-fetch("http://localhost:5000/verify", { // Updated URL to match the Flask backend on port 5000
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ code: userCode }) // Send user code in JSON format
-})
-    .then((response) => response.json())
-    .then((data) => {
-        if (data.correct) { // Assuming the backend sends 'correct' instead of 'success'
-            // If code is correct, set a Storyline variable 'IsCorrect' to true
-            player.SetVar("IsCorrect", true);
+        console.log('Submitting data to backend...');
+    };
 
-            // Optionally, display a success message
-            alert("Correct output! Proceeding to the next slide.");
-        } else {
-            // If code is incorrect, set 'ErrorMessage' with the returned error
-            player.SetVar("ErrorMessage", data.error);
+    window.Script2 = function() {
+        var player = GetPlayer();
 
-            // Optionally, display the error message to the user
-            alert("Error: " + data.error);
-        }
-    })
-    .catch((error) => {
-        console.error("Error validating code:", error);
+        // Retrieve the 'userCode' variable from Storyline
+        var userCode = player.GetVar("userCode");
 
-        // Set an error message in Storyline
-        player.SetVar("ErrorMessage", "An error occurred while validating your code. Please try again.");
+        // Send 'userCode' to the backend for validation
+        fetch(`${getApiUrl(true)}/api/users/validateCode`, {  // Updated URL for validation at Level 1
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ code: userCode })
+        })
+        .then((response) => response.json())
+        .then((data) => {
+            if (data.correct) { 
+                player.SetVar("IsCorrect", true);
+                alert("Correct output! Proceeding to the next slide.");
+            } else {
+                player.SetVar("ErrorMessage", data.error);
+                alert("Error: " + data.error);
+            }
+        })
+        .catch((error) => {
+            console.error("Error validating code:", error);
+            player.SetVar("ErrorMessage", "An error occurred while validating your code. Please try again.");
+            alert("An error occurred while validating your code. Please try again.");
+        });
+    };
 
-        // Optionally, display an error message to the user
-        alert("An error occurred while validating your code. Please try again.");
-    });
+    window.Script3 = function() {
+        const player = GetPlayer();
 
-}
+        // Get user details from Storyline variables
+        const Username = player.GetVar("Username");
+        const Useryear = player.GetVar("Useryear");
+        const Userhallticketno = player.GetVar("Userhallticketno");
 
-window.Script3 = function()
-{
-  const player = GetPlayer();
+        console.log("Storyline Variables:");
+        console.log("Username:", Username);
+        console.log("Useryear:", Useryear);
+        console.log("Userhallticketno:", Userhallticketno);
 
-// Get user details from Storyline variables
-const Username = player.GetVar("Username");
-const Useryear = player.GetVar("Useryear");
-const Userhallticketno = player.GetVar("Userhallticketno");
+        // Send data to the backend to update the level
+        fetch(`${getApiUrl()}/api/users/updateUserLevel`, {  // Updated to PATCH route
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                Username: Username,
+                Useryear: Useryear,
+                Userhallticketno: Userhallticketno,
+                level: 1
+            }),
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response from server:', data);
+            player.SetVar("GoToNextSlide1", true);
+        })
+        .catch(error => {
+            console.error('Error updating user level:', error);
+            player.SetVar("GoToNextSlide1", false);
+        });
+    };
 
-console.log("Storyline Variables:");
-console.log("Username:", Username);
-console.log("Useryear:", Useryear);
-console.log("Userhallticketno:", Userhallticketno);
+    window.Script4 = function() {
+        var player = GetPlayer();
+        var userCode1 = player.GetVar("userCode1");
 
-// Send data to the backend to update the level
-fetch('http://localhost:3000/api/users/level', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-        Username: Username,
-        Useryear: Useryear,
-        Userhallticketno: Userhallticketno,
-        level: 1
-    }),
-})
-.then(response => {
-    if (!response.ok) {
-        throw new Error('Network response was not ok');
-    }
-    return response.json();
-})
-.then(data => {
-    console.log('Response from server:', data);
-    // Set a Storyline variable to true after the fetch completes
-    player.SetVar("GoToNextSlide1", true);
-})
-.catch(error => {
-    console.error('Error updating user level:', error);
-    // Optionally, handle errors and stay on the current slide
-    player.SetVar("GoToNextSlide1", false);
-});
+        fetch(`${getApiUrl(true)}/api/users/validateCodeLevel2`, {  // URL for Level 2 validation
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ code: userCode1, level: 2 })
+        })
+        .then((response) => response.json())
+        .then((data) => {
+            if (data.correct) { 
+                player.SetVar("IsCorrect1", true);
+                alert("Correct output! Proceeding to the next slide.");
+            } else {
+                player.SetVar("ErrorMessage", data.error);
+                alert("Error: " + data.error);
+            }
+        })
+        .catch((error) => {
+            console.error("Error validating code:", error);
+            player.SetVar("ErrorMessage", "An error occurred while validating your code. Please try again.");
+            alert("An error occurred while validating your code. Please try again.");
+        });
+    };
 
-}
+    window.Script5 = function() {
+        const player = GetPlayer();
+        const Username = player.GetVar("Username");
+        const Useryear = player.GetVar("Useryear");
+        const Userhallticketno = player.GetVar("Userhallticketno");
 
-window.Script4 = function()
-{
-  // Access the Storyline Player
-var player = GetPlayer();
+        console.log("Storyline Variables:");
+        console.log("Username:", Username);
+        console.log("Useryear:", Useryear);
+        console.log("Userhallticketno:", Userhallticketno);
 
-// Retrieve the 'userCode1' variable from Storyline (Level 2 code input by the user)
-var userCode1 = player.GetVar("userCode1");
+        fetch(`${getApiUrl()}/api/users/level`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                Username: Username,
+                Useryear: Useryear,
+                Userhallticketno: Userhallticketno,
+                level: 2
+            }),
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response from server:', data);
+            player.SetVar("GoToNextSlide2", true);
+        })
+        .catch(error => {
+            console.error('Error updating user level:', error);
+            player.SetVar("GoToNextSlide2", false);
+        });
+    };
 
-// Define the backend endpoint for Level 2 validation
-var backendEndpoint = "http://localhost:5000/verify";
+    window.Script6 = function() {
+        var player = GetPlayer();
+        var userCode2 = player.GetVar("userCode2");
 
-// Send 'userCode1' to the backend for validation (Level 2)
-fetch(backendEndpoint, {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ 
-        code: userCode1,  // Pass the user's code
-        level: 2          // Specify Level 2 validation
-    })
-})
-    .then((response) => response.json())
-    .then((data) => {
-        if (data.correct) { 
-            // If the code is correct, set the 'IsCorrect1' Storyline variable to true
-            player.SetVar("IsCorrect1", true);
-
-            // Optionally, display a success message
-            alert("Correct output! Proceeding to the next slide.");
-        } else {
-            // If the code is incorrect, set the 'ErrorMessage' Storyline variable
-            player.SetVar("ErrorMessage", data.error);
-
-            // Optionally, display the error message to the user
-            alert("Error: " + data.error);
-        }
-    })
-    .catch((error) => {
-        console.error("Error validating code:", error);
-
-        // Set an error message in Storyline
-        player.SetVar("ErrorMessage", "An error occurred while validating your code. Please try again.");
-
-        // Optionally, display an error message to the user
-        alert("An error occurred while validating your code. Please try again.");
-    });
-
-}
-
-window.Script5 = function()
-{
-  const player = GetPlayer();
-
-// Get user details from Storyline variables
-const Username = player.GetVar("Username");
-const Useryear = player.GetVar("Useryear");
-const Userhallticketno = player.GetVar("Userhallticketno");
-
-console.log("Storyline Variables:");
-console.log("Username:", Username);
-console.log("Useryear:", Useryear);
-console.log("Userhallticketno:", Userhallticketno);
-
-// Send data to the backend to update the level
-fetch('http://localhost:3000/api/users/level', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-        Username: Username,
-        Useryear: Useryear,
-        Userhallticketno: Userhallticketno,
-        level: 2
-    }),
-})
-.then(response => {
-    if (!response.ok) {
-        throw new Error('Network response was not ok');
-    }
-    return response.json();
-})
-.then(data => {
-    console.log('Response from server:', data);
-    // Set a Storyline variable to true after the fetch completes
-    player.SetVar("GoToNextSlide2", true);
-})
-.catch(error => {
-    console.error('Error updating user level:', error);
-    // Optionally, handle errors and stay on the current slide
-    player.SetVar("GoToNextSlide2", false);
-});
-
-}
-
-window.Script6 = function()
-{
-  // Access the Storyline Player
-var player = GetPlayer();
-
-// Retrieve the 'userCode2' variable from Storyline (Level 3 code input by the user)
-var userCode2 = player.GetVar("userCode2");
-
-// Define the backend endpoint for Level 3 validation
-var backendEndpoint = "http://localhost:5000/verify";
-
-// Send 'userCode2' to the backend for validation (Level 3)
-fetch(backendEndpoint, {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ 
-        code: userCode2,  // Pass the user's code
-        level: 3         // Specify Level 3 validation
-    })
-})
-    .then((response) => response.json())
-    .then((data) => {
-        if (data.correct) { 
-            // If the code is correct, set the 'IsCorrect2' Storyline variable to true
-            player.SetVar("IsCorrect2", true);
-
-            // Optionally, display a success message
-            alert("Correct output! Proceeding to the next slide.");
-        } else {
-            // If the code is incorrect, set the 'ErrorMessage' Storyline variable
-            player.SetVar("ErrorMessage", data.error);
-
-            // Optionally, display the error message to the user
-            alert("Error: " + data.error);
-        }
-    })
-    .catch((error) => {
-        console.error("Error validating code:", error);
-
-        // Set an error message in Storyline
-        player.SetVar("ErrorMessage", "An error occurred while validating your code. Please try again.");
-
-        // Optionally, display an error message to the user
-        alert("An error occurred while validating your code. Please try again.");
-    });
-
-}
-
-window.Script7 = function()
-{
-  const player = GetPlayer();
-
-// Get user details from Storyline variables
-const Username = player.GetVar("Username");
-const Useryear = player.GetVar("Useryear");
-const Userhallticketno = player.GetVar("Userhallticketno");
-
-console.log("Storyline Variables:");
-console.log("Username:", Username);
-console.log("Useryear:", Useryear);
-console.log("Userhallticketno:", Userhallticketno);
-
-// Send data to the backend to update the level
-fetch('http://localhost:3000/api/users/level', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-        Username: Username,
-        Useryear: Useryear,
-        Userhallticketno: Userhallticketno,
-        level: 3
-    }),
-})
-.then(response => {
-    if (!response.ok) {
-        throw new Error('Network response was not ok');
-    }
-    return response.json();
-})
-.then(data => {
-    console.log('Response from server:', data);
-    // Set a Storyline variable to true after the fetch completes
-    player.SetVar("IsCorrect2", true);
-})
-.catch(error => {
-    console.error('Error updating user level:', error);
-    // Optionally, handle errors and stay on the current slide
-    player.SetVar("IsCorrect2", false);
-});
-
-}
-
+        fetch(`${getApiUrl(true)}/api/users/validateCodeLevel3`, {  // URL for Level 3 validation
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ code: userCode2, level: 3 })
+        })
+        .then((response) => response.json())
+        .then((data) => {
+            if (data.correct) { 
+                player.SetVar("IsCorrect2", true);
+                alert("Correct output! Proceeding to the next slide.");
+            } else {
+                player.SetVar("ErrorMessage", data.error);
+                alert("Error: " + data.error);
+            }
+        })
+        .catch((error) => {
+            console.error("Error validating code:", error);
+            player.SetVar("ErrorMessage", "An error occurred while validating your code. Please try again.");
+            alert("An error occurred while validating your code. Please try again.");
+        });
+    };
 };
